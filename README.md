@@ -12,6 +12,8 @@ The ETL pipeline is deployed on AWS and utilizes the following services:
 - **AWS Glue Workflows**: Orchestrates the ETL workflow.
 - **AWS IAM**: Used for establishing roles and permissions.
 
+![image etl-glue](./lib/assets/architecture/etl_glue.png)
+
 ## Dataset Description
 The Olist Store dataset includes multiple CSV files containing:
 - Orders and customer data
