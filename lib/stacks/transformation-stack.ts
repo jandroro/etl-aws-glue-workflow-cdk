@@ -149,7 +149,7 @@ export class TransformationStack extends cdk.NestedStack {
             executionProperty: {
                 maxConcurrentRuns: 1
             }
-          });
+        });
 
           // Process Sales Silver Data
         const jobProcessSalesSilverConfig = {
@@ -188,8 +188,112 @@ export class TransformationStack extends cdk.NestedStack {
             executionProperty: {
                 maxConcurrentRuns: 1
             }
-          });
+        });
 
+        // ********************************************
+        // GLUE WORKFLOWS
+        // ********************************************
+
+        // Create the Glue Workflow
+        const etlGlueWorkflow = new glue.CfnWorkflow(this, 'EtlGlueWorkflow', {
+            name: 'Etl-Glue-Workflow',
+            description: 'ETL Glue Workflow',
+            maxConcurrentRuns: 1
+        });
+
+        // Trigger Crawler Sales Bronze
+        new glue.CfnTrigger(this, 'TriggerCrawlerSalesBronze', {
+            name: 'StartEtlWorkflow',
+            description: 'Start Workflow',
+            type: 'ON_DEMAND',
+            workflowName: etlGlueWorkflow.ref,
+            actions: [{
+                crawlerName: crawlerSalesBronze.ref   
+            }]
+        });
+
+        // Trigger Process Sales Bronze
+        new glue.CfnTrigger(this, 'TriggerJobProcessSalesBronze', {
+            name: 'Evaluate_Crawler_Bronze',
+            description: 'Evaluate state of the crawler for sales bronze data',
+            type: 'CONDITIONAL',
+            workflowName: etlGlueWorkflow.ref,
+            actions: [{
+                jobName: jobProcessSalesBronze.ref,
+                timeout: 10
+            }],
+            predicate: {
+                conditions: [{
+                    logicalOperator: 'EQUALS',
+                    crawlerName: crawlerSalesBronze.ref,
+                    crawlState: 'SUCCEEDED'
+                }],
+                logical: 'AND'
+            },
+            startOnCreation: true
+        });
+
+        // Trigger Crawler Sales Silver
+        new glue.CfnTrigger(this, 'TriggerCrawlerSalesSilver', {
+            name: 'Evaluate_Job_Bronze',
+            description: 'Evaluate state of the job for processing sales bronze data',
+            type: 'CONDITIONAL',
+            workflowName: etlGlueWorkflow.ref,
+            actions: [{
+                crawlerName: crawlerSalesSilver.ref
+            }],
+            predicate: {
+                conditions: [{
+                    logicalOperator: 'EQUALS',
+                    jobName: jobProcessSalesBronze.ref,
+                    state: 'SUCCEEDED'
+                }],
+                logical: 'AND'
+            },
+            startOnCreation: true
+        });
+
+        // Trigger Process Sales Silver
+        new glue.CfnTrigger(this, 'TriggerJobProcessSalesSilver', {
+            name: 'Evaluate_Crawler_Silver',
+            description: 'Evaluate state of the crawler for sales silver data',
+            type: 'CONDITIONAL',
+            workflowName: etlGlueWorkflow.ref,
+            actions: [{
+                jobName: jobProcessSalesSilver.ref,
+                timeout: 10
+            }],
+            predicate: {
+                conditions: [{
+                    logicalOperator: 'EQUALS',
+                    crawlerName: crawlerSalesSilver.ref,
+                    crawlState: 'SUCCEEDED'
+                }],
+                logical: 'AND'
+            },
+            startOnCreation: true
+        });
+
+        // Trigger Crawler Sales Gold
+        new glue.CfnTrigger(this, 'TriggerCrawlerSalesGold', {
+            name: 'Evaluate_Job_Silver',
+            description: 'Evaluate state of the job for processing sales silver data',
+            type: 'CONDITIONAL',
+            workflowName: etlGlueWorkflow.ref,
+            actions: [{
+                crawlerName: crawlerSalesGold.ref
+            }],
+            predicate: {
+                conditions: [{
+                    logicalOperator: 'EQUALS',
+                    jobName: jobProcessSalesSilver.ref,
+                    state: 'SUCCEEDED'
+                }],
+                logical: 'AND'
+            },
+            startOnCreation: true
+        });
+        
         // ********************************************
         // OUTPUTS
         // ********************************************
@@ -225,6 +329,12 @@ export class TransformationStack extends cdk.NestedStack {
         new cdk.CfnOutput(this, 'JobProcessSalesSilverName', {
             value: jobProcessSalesSilver.ref,
             description: 'Job Process Sales Silver'
+        });
+
+        // Workflows
+        new cdk.CfnOutput(this, 'EtlGlueWorkflowName', {
+            value: etlGlueWorkflow.ref,
+            description: 'ETL Glue Workflow'
         });
     }
 }
